@@ -1,0 +1,36 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies specific to app directory
+/app/node_modules
+/app/.pnp
+/app.pnp.*
+/app/.yarn/*
+!/app/.yarn/patches
+!/app/.yarn/plugins
+!/app/.yarn/releases
+!/app/.yarn/versions
+
+# build outputs
+/app/build
+/app/.next
+/app/.out
+
+# misc
+/app/.DS_Store
+/app/*.pem
+
+# next.js (redundant but harmless)
+/app/.next/
+/app/out/
+
+# env files (can opt-in for committing if needed)
+.env***/.env
+!**/.env.example
+
+# typescript
+/app/*.tsbuildinfo
+/app/next-env.d.ts
+
+# Traefik
+infrastructure/traefik/letsencrypt/
+infrastructure/traefik/logs/
