@@ -29,8 +29,8 @@ SCP       := scp -P $(VM_PORT)
         secrets-check secrets-push \
         secrets-push-traefik secrets-push-seafile \
         secrets-push-umami secrets-push-dashboard \
-        secrets-pull \
         diagnose logs-traefik logs-seafile \
+        app-sync app-up app-down app-restart \
         ssh help
 
 # ══════════════════════════════════════════════════════════════════
@@ -179,10 +179,32 @@ logs-traefik-access:
 	$(SSH) 'tail -f ~/traefik/logs/access.log'
 
 # ══════════════════════════════════════════════════════════════════
+# APP
+# ══════════════════════════════════════════════════════════════════
+app-sync:
+	$(SSH) 'mkdir -p ~/app'
+	$(SCP) infrastructure/app/docker-compose.yml \
+		$(VM_USER)@$(VM_HOST):~/app/docker-compose.yml
+	@echo "✓ ~/app/docker-compose.yml uploaded"
+
+app-up:
+	$(SSH) 'cd ~/app && docker compose pull && docker compose up -d'
+
+app-down:
+	$(SSH) 'cd ~/app && docker compose down'
+
+app-restart:
+	$(SSH) 'cd ~/app && docker compose restart'
+
+logs-app:
+	$(SSH) 'docker logs -f website'
+
+# ══════════════════════════════════════════════════════════════════
 # ACCESS
 # ══════════════════════════════════════════════════════════════════
 ssh:
 	$(SSHT)
+
 
 # ══════════════════════════════════════════════════════════════════
 # HELP
@@ -212,6 +234,8 @@ help:
 	@echo "  make seafile-restart       Restart Seafile containers"
 	@echo "  make seafile-down          Stop Seafile "
 	@echo "  make seafile-snapshot      Snapshot conf files from VM to local"
+	@echo "APP"
+	@echo "  make app-sync              Sync app docker to VM"
 	@echo ""
 	@echo "LOGS & DEBUG"
 	@echo "  make diagnose              Run full diagnostics"

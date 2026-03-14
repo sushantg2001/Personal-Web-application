@@ -1,20 +1,20 @@
 # ── Stage 1: Build ────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-# Install dependencies (cached layer)
-COPY app/package.json app/package-lock.json* ./
-RUN npm ci
+# Install dependencies (cached layer — only reruns if package.json changes)
+COPY app/package.json app/bun.lockb* ./
+RUN bun install --frozen-lockfile
 
 # Copy source and build
 COPY app/ .
-RUN npm run build
+RUN bun run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────────
 FROM nginx:alpine AS runner
 
-# Copy built static files
+# Copy built static files from builder stage
 COPY --from=builder /app/out /usr/share/nginx/html
 
 # Custom nginx config
