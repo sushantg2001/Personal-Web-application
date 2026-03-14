@@ -1,40 +1,39 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies specific to app directory
-/app/node_modules
-/app/.pnp
-/app.pnp.*
-/app/.yarn/*
-!/app/.yarn/patches
-!/app/.yarn/plugins
-!/app/.yarn/releases
-!/app/.yarn/versions
+# dependencies specific to website directory
+/website/node_modules
+/website/.pnp
+/website.pnp.*
+/website/.yarn/*
+!/website/.yarn/patches
+!/website/.yarn/plugins
+!/website/.yarn/releases
+!/website/.yarn/versions
 
 # build outputs
-/app/build
-/app/.next
-/app/.out
+/website/build
+/website/.next
+/website/.out
 
 # misc
-/app/.DS_Store
-/app/*.pem
+/website/.DS_Store
+/website/*.pem
 
 # next.js (redundant but harmless)
-/app/.next/
-/app/out/
+/website/.next/
+/website/out/
 
 # env files (can opt-in for committing if needed)
 !**/.env.example
 .env.local
 
 # typescript
-/app/*.tsbuildinfo
-/app/next-env.d.ts
+/website/*.tsbuildinfo
+/website/next-env.d.ts
 
 # Traefik
 infrastructure/traefik/letsencrypt/
 infrastructure/traefik/logs/
-infrastructure/traefik/config/
 
 # Seafile
 infrastructure/seafile/conf/

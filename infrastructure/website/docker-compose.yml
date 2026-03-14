@@ -1,4 +1,4 @@
-# infrastructure/app/docker-compose.yml
+# infrastructure/website/docker-compose.yml
 # Pulls the pre-built image from GHCR and runs it behind Traefik.
 #
 # DEPLOY: handled by GitHub Actions on push to main
@@ -7,7 +7,7 @@
 
 services:
   website:
-    image: ghcr.io/sushantg2001/personal-site:latest
+    image: ghcr.io/sushantg2001/website:latest
     pull_policy: always        # always pull latest from GHCR on deploy
     container_name: website
     restart: unless-stopped

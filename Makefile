@@ -30,7 +30,7 @@ SCP       := scp -P $(VM_PORT)
         secrets-push-traefik secrets-push-seafile \
         secrets-push-umami secrets-push-dashboard \
         diagnose logs-traefik logs-seafile \
-        app-sync app-up app-down app-restart \
+        website-sync website-up website-down website-restart \
         ssh help
 
 # ══════════════════════════════════════════════════════════════════
@@ -73,7 +73,6 @@ vm-sync:
 		$(VM_USER)@$(VM_HOST):~/traefik/traefik.yml
 	$(SCP) infrastructure/traefik/config/dynamic.yml \
 		$(VM_USER)@$(VM_HOST):~/traefik/config/dynamic.yml
-	@echo "  auth.yml is managed by secrets-push, not touched here"
 
 	@echo "→ Uploading Seafile compose..."
 	$(SCP) infrastructure/seafile/docker-compose.yml \
@@ -81,7 +80,6 @@ vm-sync:
 	@echo "✓ Traefik and Seafile compose uploaded"
 	@echo "  Seafile conf files are managed by Seafile itself"
 	@echo "  Use: make seafile-snapshot to copy conf files to local"
-	@echo "  auth.yml untouched (use: make secrets-push-traefik)"
 	@echo "  auth.yml untouched (use: make secrets-push-traefik)"
 
 vm-status:
@@ -179,25 +177,28 @@ logs-traefik-access:
 	$(SSH) 'tail -f ~/traefik/logs/access.log'
 
 # ══════════════════════════════════════════════════════════════════
-# APP
+# website
 # ══════════════════════════════════════════════════════════════════
-app-sync:
-	$(SSH) 'mkdir -p ~/app'
-	$(SCP) infrastructure/app/docker-compose.yml \
-		$(VM_USER)@$(VM_HOST):~/app/docker-compose.yml
-	@echo "✓ ~/app/docker-compose.yml uploaded"
+website-up:
+	'cd ~/website && bun run dev'
 
-app-up:
-	$(SSH) 'cd ~/app && docker compose pull && docker compose up -d'
+website-sync:
+	$(SSH) 'mkdir -p ~/website'
+	$(SCP) infrastructure/website/docker-compose.yml \
+		$(VM_USER)@$(VM_HOST):~/website/docker-compose.yml
+	@echo "✓ ~/website/docker-compose.yml uploaded"
 
-app-down:
-	$(SSH) 'cd ~/app && docker compose down'
+website-up:
+	$(SSH) 'cd ~/website && docker compose pull && docker compose up -d'
 
-app-restart:
-	$(SSH) 'cd ~/app && docker compose restart'
+website-down:
+	$(SSH) 'cd ~/website && docker compose down'
 
-logs-app:
-	$(SSH) 'docker logs -f website'
+website-restart:
+	$(SSH) 'cd ~/website && docker compose restart'
+
+logs-website:
+	$(SSH) 'docker logs -f webwebsite'
 
 # ══════════════════════════════════════════════════════════════════
 # ACCESS
@@ -234,8 +235,7 @@ help:
 	@echo "  make seafile-restart       Restart Seafile containers"
 	@echo "  make seafile-down          Stop Seafile "
 	@echo "  make seafile-snapshot      Snapshot conf files from VM to local"
-	@echo "APP"
-	@echo "  make app-sync              Sync app docker to VM"
+	@echo "  make website-sync             Sync website docker to VM"
 	@echo ""
 	@echo "LOGS & DEBUG"
 	@echo "  make diagnose              Run full diagnostics"
