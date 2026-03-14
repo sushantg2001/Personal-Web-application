@@ -24,8 +24,8 @@
 /app/out/
 
 # env files (can opt-in for committing if needed)
-.env***/.env
 !**/.env.example
+.env.local
 
 # typescript
 /app/*.tsbuildinfo
@@ -34,3 +34,7 @@
 # Traefik
 infrastructure/traefik/letsencrypt/
 infrastructure/traefik/logs/
+infrastructure/traefik/config/
+
+# Seafile
+infrastructure/seafile/conf/

@@ -1,0 +1,37 @@
+# infrastructure/traefik/docker-compose.yml
+#
+# DEPLOY ORDER: This must be deployed FIRST.
+# Creates the traefik-public network that every other service attaches to.
+# Adding a new subdomain never requires touching this file.
+#
+# FIRST TIME SETUP:
+#   touch letsencrypt/acme.json && chmod 600 letsencrypt/acme.json
+#   docker compose up -d
+#
+# UPDATE TRAEFIK:
+#   docker compose pull && docker compose up -d
+
+services:
+  traefik:
+    image: traefik:v2.11
+    pull_policy: never          # always use locally loaded image, never pull
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik.yml:/traefik.yml:ro
+      - ./config:/config:ro
+      - ./letsencrypt:/letsencrypt   # SSL certs — never delete this directory
+      - ./logs:/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=false"
+
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge

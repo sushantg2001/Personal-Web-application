@@ -1,0 +1,83 @@
+# infrastructure/seafile/docker-compose.yml
+#
+# Config files are stored locally in infrastructure/seafile/conf/
+# and mounted individually into the container.
+# This means the conf files inside ./data/seafile/conf/ are IGNORED —
+# the locally managed files always take precedence.
+#
+# Workflow:
+#   Edit config locally → make vm-sync → make seafile-restart
+#
+# NEVER run docker pull — pull_policy: never enforces local image use.
+# Load images first with: make seafile-load-images
+
+services:
+  db:
+    image: mariadb:10.11
+    pull_policy: never
+    container_name: seafile-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_LOG_CONSOLE=true
+      - MARIADB_AUTO_UPGRADE=1
+    volumes:
+      - ./mysql/db:/var/lib/mysql
+    networks:
+      - seafile-net
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  memcached:
+    image: memcached:1.6.18
+    pull_policy: never
+    container_name: seafile-memcached
+    restart: unless-stopped
+    entrypoint: memcached -m 256
+    networks:
+      - seafile-net
+
+  seafile:
+    image: docker.seadrive.org/seafileltd/seafile-pro-mc:10.0-latest
+    pull_policy: never
+    container_name: seafile
+    restart: unless-stopped
+    volumes:
+      # Single data volume — Seafile manages all files here including conf.
+      # Config files are managed locally and pushed into the data volume
+      # via vm-sync. This allows Seafile to initialize freely on first boot
+      # while still giving full local control over settings.
+      - ./data:/shared
+    environment:
+      - DB_HOST=db
+      - DB_ROOT_PASSWD=${DB_ROOT_PASSWORD}
+      - TIME_ZONE=Asia/Kolkata
+      - SEAFILE_ADMIN_EMAIL=${SEAFILE_ADMIN_EMAIL}
+      - SEAFILE_ADMIN_PASSWORD=${SEAFILE_ADMIN_PASSWORD}
+      - SEAFILE_SERVER_LETSENCRYPT=False
+      - SEAFILE_SERVER_HOSTNAME=storage.sushantgupta.cloud
+    depends_on:
+      db:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+    networks:
+      - seafile-net
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.seafile.rule=Host(`storage.sushantgupta.cloud`)"
+      - "traefik.http.routers.seafile.entrypoints=websecure"
+      - "traefik.http.routers.seafile.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.seafile.middlewares=secure-headers@file"
+      - "traefik.http.services.seafile.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik-public"
+
+networks:
+  seafile-net:
+    driver: bridge
+  traefik-public:
+    external: true

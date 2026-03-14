@@ -1,0 +1,49 @@
+# infrastructure/traefik/traefik.yml
+# Static configuration — requires Traefik restart on changes.
+#
+# Design decisions:
+#   - HTTP-01 challenge for Let's Encrypt (no DNS provider API needed)
+#   - exposedByDefault: false — every container must opt-in via labels
+#   - Single shared network (traefik-public) — all routed containers join it
+#   - File provider enabled for non-Docker services and middleware definitions
+
+
+api:
+  dashboard: true
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: sushantg2001@gmail.com
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: traefik-public
+    watch: true
+  file:
+    directory: /config
+    watch: true
+
+log:
+  level: INFO
+
+accessLog:
+  filePath: "/logs/access.log"
+  bufferingSize: 100
