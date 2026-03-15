@@ -179,8 +179,8 @@ logs-traefik-access:
 # ══════════════════════════════════════════════════════════════════
 # website
 # ══════════════════════════════════════════════════════════════════
-website-up:
-	'cd ~/website && bun run dev'
+website-dev:
+	cd ./website && bun run dev
 
 website-sync:
 	$(SSH) 'mkdir -p ~/website'
@@ -199,6 +199,16 @@ website-restart:
 
 logs-website:
 	$(SSH) 'docker logs -f webwebsite'
+
+# BLOG PUBLISHING
+# ══════════════════════════════════════════════════════════════════
+# Copy published posts from Obsidian vault → repo → deploy
+# Only posts with published: true in frontmatter are copied
+# ══════════════════════════════════════════════════════════════════
+publish:
+	@chmod +x scripts/publish.sh
+	@bash scripts/publish.sh $(if $(m),"$(m)",)
+
 
 # ══════════════════════════════════════════════════════════════════
 # ACCESS
@@ -235,7 +245,17 @@ help:
 	@echo "  make seafile-restart       Restart Seafile containers"
 	@echo "  make seafile-down          Stop Seafile "
 	@echo "  make seafile-snapshot      Snapshot conf files from VM to local"
-	@echo "  make website-sync             Sync website docker to VM"
+	@echo ""
+	@echo "WEBSITE"
+	@echo "  make website-dev           Start website in development mode"
+	@echo "  make website-sync          Sync website docker to VM"
+	@echo "  make website-up            website up"
+	@echo "  make website-down          website down"
+	@echo "  make website-restart       website restart"
+	@echo "  make website-logs          docker logs for website container"
+	@echo ""
+	@echo "BLOG PUBLISHING"
+	@echo "  make publish          		publish blog posts from Obsidian to website"
 	@echo ""
 	@echo "LOGS & DEBUG"
 	@echo "  make diagnose              Run full diagnostics"
