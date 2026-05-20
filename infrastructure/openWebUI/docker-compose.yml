@@ -1,0 +1,69 @@
+## Discontinued for now
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.9.4-slim
+    container_name: open-webui
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/backend/data
+    logging:
+      # --- ?? DOCKER LOG ROTATION GUARD ---
+      # Prevents Docker from keeping infinite container logs on your host machine
+      driver: "json-file"
+      options:
+        max-size: "10m" # Caps individual log files at 10 Megabytes
+        max-file: "10" # Retains only the 3 most recent files (Max 30MB total log footprint)
+    environment:
+      # Default Settings
+      - "WEBUI_ADMIN_EMAIL=${WEBUI_ADMIN_EMAIL}"
+      - "WEBUI_ADMIN_PASSWORD=${WEBUI_ADMIN_PASSWORD}"
+      - "OPENAI_API_BASE_URL=https://openrouter.ai/api/v1"
+      - "OPENAI_API_KEY=${OPENROUTER_API_KEY}"
+      - "WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}"
+      - "WEBUI_AUTH=true"
+      - "ENABLE_OLLAMA_API=false"
+      - "OLLAMA_BASE_URL="
+
+      # --- DISK WRITE REDUCTION ---
+      - "GLOBAL_LOG_LEVEL=ERROR" # Drops default 'INFO' chatter; writes to disk only on critical errors
+      - "UVICORN_WORKERS=1"
+
+      # --- OFFLOAD RETRIEVAL WORK TO OPENROUTER ---
+      - "RAG_EMBEDDING_ENGINE=openai"
+      - "RAG_OPENAI_API_BASE_URL=https://openrouter.ai/api/v1"
+      - "RAG_OPENAI_API_KEY=${OPENROUTER_API_KEY}"
+      - "RAG_EMBEDDING_MODEL=text-embedding-3-small" # not openai/text-embedding-3-small
+
+      # --- RETENTION & SPEED CACHES ---
+      - "ENABLE_BASE_MODELS_CACHE=True"
+      - "MODELS_CACHE_TTL=300"
+      - "ENABLE_QUERIES_CACHE=True"
+      - "AUDIO_STT_ENGINE=webapi"
+
+      # --- DISABLE BACKGROUND NOISE ---
+      - "ENABLE_IMAGE_GENERATION=false"
+      - "ENABLE_CODE_INTERPRETER=false"
+      - "ENABLE_AUTOCOMPLETE_GENERATION=false"
+      - "ENABLE_FOLLOW_UP_GENERATION=false"
+      - "ENABLE_TITLE_GENERATION=false" # Saves database rows from constant background workspace writes
+      - "ENABLE_COMMUNITY_SHARING=false"
+      - "ENABLE_MESSAGE_RATING=false"
+      - "ENABLE_EVALUATION_ARENA_MODELS=false"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openwebui.rule=Host(`ai.sushantgupta.cloud`)"
+      - "traefik.http.routers.openwebui.entrypoints=websecure"
+      - "traefik.http.routers.openwebui.tls.certresolver=letsencrypt"
+      - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
+    networks:
+      - traefik-public
+    deploy:
+      resources:
+        limits:
+          memory: 1024m
+        reservations:
+          memory: 256m
+
+networks:
+  traefik-public:
+    external: true

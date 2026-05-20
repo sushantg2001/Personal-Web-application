@@ -74,13 +74,10 @@ check_required "SEAFILE_ADMIN_EMAIL"
 check_required "SEAFILE_ADMIN_PASSWORD"
 
 echo ""
-echo "── Umami (optional — needed when deploying analytics) ────────"
-check_optional "UMAMI_DB_PASSWORD"
-check_optional "UMAMI_APP_SECRET"
+echo "── Open WebUI ────────────────────────────────"
+check_required "OPENROUTER_API_KEY"
+check_required "WEBUI_SECRET_KEY"
 
-echo ""
-echo "── Portainer (optional — needed when deploying dashboard) ────"
-check_optional "PORTAINER_ADMIN_PASSWORD"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

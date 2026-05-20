@@ -7,7 +7,6 @@
 #   - Single shared network (traefik-public) — all routed containers join it
 #   - File provider enabled for non-Docker services and middleware definitions
 
-
 api:
   dashboard: true
   insecure: false
@@ -42,8 +41,9 @@ providers:
     watch: true
 
 log:
-  level: INFO
+  level: ERROR
 
 accessLog:
   filePath: "/logs/access.log"
   bufferingSize: 100
+

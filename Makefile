@@ -25,13 +25,72 @@ SCP       := scp -P $(VM_PORT)
 
 .PHONY: vm-setup vm-sync vm-status vm-prune \
         traefik-up traefik-restart \
-        seafile-up seafile-restart seafile-down seafile-load-images seafile-snapshot \
-        secrets-check secrets-push \
-        secrets-push-traefik secrets-push-seafile \
-        secrets-push-umami secrets-push-dashboard \
-        diagnose logs-traefik logs-seafile \
+        seafile-up seafile-restart seafile-down seafile-load-images seafile-snapshot seafile-restore\
         website-sync website-up website-down website-restart \
+		chat-up chat-down chat-restart \
+        secrets-check secrets-push secrets-push-traefik secrets-push-seafile \
+        diagnose logs-traefik logs-seafile \
         ssh help
+
+# ══════════════════════════════════════════════════════════════════
+# HELP
+# ══════════════════════════════════════════════════════════════════
+help:
+	@echo ""
+	@echo "SETUP"
+	@echo "  make vm-setup              First-time VM setup"
+	@echo "  make vm-sync               Upload config files (never touches data/)"
+	@echo "  make vm-status             Show running containers"
+	@echo "  make vm-prune              Remove unused images only"
+	@echo ""
+	@echo "TRAEFIK"
+	@echo "  make traefik-up            Deploy Traefik from local image"
+	@echo "  make traefik-restart       Restart Traefik"
+	@echo ""
+	@echo "SEAFILE"
+	@echo "  make seafile-up            Load images + start Seafile"
+	@echo "  make seafile-load-images   Load images from tarballs only"
+	@echo "  make seafile-restart       Restart Seafile containers"
+	@echo "  make seafile-down          Stop Seafile "
+	@echo "  make seafile-snapshot      Snapshot conf files from VM to local"
+	@echo "  make seafile-restore          Snapshot conf files from local to vm"
+	@echo ""
+	@echo "WEBSITE"
+	@echo "  make website-dev           Start website in development mode"
+	@echo "  make website-sync          Sync website docker to VM"
+	@echo "  make website-up            website up"
+	@echo "  make website-down          website down"
+	@echo "  make website-restart       website restart"
+	@echo "  make website-logs          docker logs for website container"
+	@echo ""
+	@echo "CHAT"
+	@echo " make chat-up                Start open WebUI"
+	@echo " make chat-down              Stop open WebUI"
+	@echo " make chat-up                Restart open WebUI"
+	@echo ""
+	@echo "BLOG PUBLISHING"
+	@echo "  make publish          		publish blog posts from Obsidian to website"
+	@echo ""
+	@echo "SECRETS (credentials only)"
+	@echo "  make secrets-check          Verify .env.local is complete"
+	@echo "  make secrets-push           Push all secrets to VM"
+	@echo "  make secrets-push-traefik   Push Traefik auth only"
+	@echo "  make secrets-push-seafile   Push Seafile .env only"
+	@echo "  make secrets-push-openwebui Push openWebUI .env only"
+	@echo "  make secrets-pull           Pull VM secrets back for review"
+	@echo ""
+	@echo "LOGS & DEBUG"
+	@echo "  make diagnose              Run full diagnostics"
+	@echo "  make logs-traefik          Tail Traefik logs"
+	@echo "  make logs-seafile          Tail Seafile logs"
+	@echo "  make ssh                   SSH into VM"
+	@echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# ACCESS
+# ══════════════════════════════════════════════════════════════════
+ssh:
+	$(SSHT)
 
 # ══════════════════════════════════════════════════════════════════
 # VM SETUP
@@ -45,9 +104,9 @@ vm-setup:
 		~/traefik/letsencrypt \
 		~/traefik/logs \
 		~/traefik/images \
-		~/seafile/images'
+		~/seafile/images \
+		~/openWebUI/'
 	@$(MAKE) vm-sync
-	@$(MAKE) secrets-push
 	@echo "✓ VM ready."
 
 # ══════════════════════════════════════════════════════════════════
@@ -77,10 +136,15 @@ vm-sync:
 	@echo "→ Uploading Seafile compose..."
 	$(SCP) infrastructure/seafile/docker-compose.yml \
 		$(VM_USER)@$(VM_HOST):~/seafile/docker-compose.yml
-	@echo "✓ Traefik and Seafile compose uploaded"
+
+	@echo "→ Uploading openWebUI compose..."
+	$(SCP) infrastructure/openWebUI/docker-compose.yml \
+		$(VM_USER)@$(VM_HOST):~/openWebUI/docker-compose.yml
+
+	@echo "✓ Traefik files uploaded"
+	@echo "✓ Seafile and openWebUI compose uploaded"
 	@echo "  Seafile conf files are managed by Seafile itself"
 	@echo "  Use: make seafile-snapshot to copy conf files to local"
-	@echo "  auth.yml untouched (use: make secrets-push-traefik)"
 
 vm-status:
 	$(SSH) 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"'
@@ -90,29 +154,6 @@ vm-prune:
 	$(SSH) 'docker image prune -f'
 	@echo "✓ Unused images removed. Volumes untouched."
 
-# ══════════════════════════════════════════════════════════════════
-# SECRETS — credentials only, never non-secret config
-# ══════════════════════════════════════════════════════════════════
-secrets-check:
-	@bash scripts/secrets-check.sh
-
-secrets-push: secrets-check
-	@bash scripts/secrets-push.sh all
-
-secrets-push-traefik: secrets-check
-	@bash scripts/secrets-push.sh traefik
-
-secrets-push-seafile: secrets-check
-	@bash scripts/secrets-push.sh seafile
-
-secrets-push-umami: secrets-check
-	@bash scripts/secrets-push.sh umami
-
-secrets-push-dashboard: secrets-check
-	@bash scripts/secrets-push.sh dashboard
-
-secrets-pull:
-	@bash scripts/secrets-pull.sh
 
 # ══════════════════════════════════════════════════════════════════
 # TRAEFIK
@@ -161,20 +202,19 @@ seafile-snapshot:
 	@echo "✓ Snapshot saved to $(SNAPSHOT_DIR)"
 	@echo "  Commit this to git to preserve for future deployments"
 
-# ══════════════════════════════════════════════════════════════════
-# DIAGNOSTICS & LOGS
-# ══════════════════════════════════════════════════════════════════
-diagnose:
-	@bash scripts/diagnose.sh
-
-logs-traefik:
-	$(SSH) 'docker logs -f traefik'
-
-logs-seafile:
-	$(SSH) 'docker logs -f seafile'
-
-logs-traefik-access:
-	$(SSH) 'tail -f ~/traefik/logs/access.log'
+## NOTE: Need to fix this. Cannot be used right now
+seafile-restore:
+	$(eval LATEST_SNAPSHOT := $(shell ls -td infrastructure/seafile/conf/snapshots/*/ | head -1))
+	@if [ -z "$(LATEST_SNAPSHOT)" ]; then echo "Error: No snapshots found."; exit 1; fi
+	@echo "Uploading configuration from: $(LATEST_SNAPSHOT)"
+	$(SCP) $(LATEST_SNAPSHOT)seahub_settings.py $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/seahub_settings.py
+	$(SCP) $(LATEST_SNAPSHOT)ccnet.conf $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/ccnet.conf
+	$(SCP) $(LATEST_SNAPSHOT)seafile.conf $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/seafile.conf
+	$(SCP) $(LATEST_SNAPSHOT)seafdav.conf $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/seafdav.conf
+	$(SCP) $(LATEST_SNAPSHOT)seafevents.conf $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/seafevents.conf
+	$(SCP) $(LATEST_SNAPSHOT)gunicorn.conf.py $(VM_USER)@$(VM_HOST):~/seafile/data/seafile/conf/gunicorn.conf.py
+	$(SCP) $(LATEST_SNAPSHOT)nginx.conf $(VM_USER)@$(VM_HOST):~/seafile/data/nginx/conf/seafile.nginx.conf
+	@echo "Restore complete. Remember to restart your Seafile containers."
 
 # ══════════════════════════════════════════════════════════════════
 # website
@@ -197,8 +237,6 @@ website-down:
 website-restart:
 	$(SSH) 'cd ~/website && docker compose restart'
 
-logs-website:
-	$(SSH) 'docker logs -f webwebsite'
 
 # BLOG PUBLISHING
 # ══════════════════════════════════════════════════════════════════
@@ -210,56 +248,58 @@ publish:
 	@bash scripts/publish.sh $(if $(m),"$(m)",)
 
 
-# ══════════════════════════════════════════════════════════════════
-# ACCESS
-# ══════════════════════════════════════════════════════════════════
-ssh:
-	$(SSHT)
+chat-up:
+	$(SSH) 'cd ~/openWebUI && docker compose pull && docker compose up -d'
+
+chat-down:
+	$(SSH) 'cd ~/openWebUI && docker compose down'
+
+chat-restart:
+	$(SSH) 'cd ~/openWebUI && docker compose restart'
 
 
 # ══════════════════════════════════════════════════════════════════
-# HELP
+# DIAGNOSTICS & LOGS
 # ══════════════════════════════════════════════════════════════════
-help:
-	@echo ""
-	@echo "SETUP"
-	@echo "  make vm-setup              First-time VM setup"
-	@echo "  make vm-sync               Upload config files (never touches data/)"
-	@echo "  make vm-status             Show running containers"
-	@echo "  make vm-prune              Remove unused images only"
-	@echo ""
-	@echo "SECRETS (credentials only)"
-	@echo "  make secrets-check         Verify .env.local is complete"
-	@echo "  make secrets-push          Push all secrets to VM"
-	@echo "  make secrets-push-traefik  Push Traefik auth only"
-	@echo "  make secrets-push-seafile  Push Seafile .env only"
-	@echo "  make secrets-pull          Pull VM secrets back for review"
-	@echo ""
-	@echo "TRAEFIK"
-	@echo "  make traefik-up            Deploy Traefik from local image"
-	@echo "  make traefik-restart       Restart Traefik"
-	@echo ""
-	@echo "SEAFILE"
-	@echo "  make seafile-up            Load images + start Seafile"
-	@echo "  make seafile-load-images   Load images from tarballs only"
-	@echo "  make seafile-restart       Restart Seafile containers"
-	@echo "  make seafile-down          Stop Seafile "
-	@echo "  make seafile-snapshot      Snapshot conf files from VM to local"
-	@echo ""
-	@echo "WEBSITE"
-	@echo "  make website-dev           Start website in development mode"
-	@echo "  make website-sync          Sync website docker to VM"
-	@echo "  make website-up            website up"
-	@echo "  make website-down          website down"
-	@echo "  make website-restart       website restart"
-	@echo "  make website-logs          docker logs for website container"
-	@echo ""
-	@echo "BLOG PUBLISHING"
-	@echo "  make publish          		publish blog posts from Obsidian to website"
-	@echo ""
-	@echo "LOGS & DEBUG"
-	@echo "  make diagnose              Run full diagnostics"
-	@echo "  make logs-traefik          Tail Traefik logs"
-	@echo "  make logs-seafile          Tail Seafile logs"
-	@echo "  make ssh                   SSH into VM"
-	@echo ""
+diagnose:
+	@bash scripts/diagnose.sh
+
+logs-traefik:
+	$(SSH) 'docker logs -f traefik'
+
+logs-seafile:
+	$(SSH) 'docker logs -f seafile'
+
+logs-traefik-access:
+	$(SSH) 'tail -f ~/traefik/logs/access.log'
+
+logs-chat:
+	$(SSH) 'cd ~/openWebUI && docker compose logs -f '
+
+logs-website:
+	$(SSH) 'docker logs -f webwebsite'
+
+# ══════════════════════════════════════════════════════════════════
+# SECRETS — credentials only, never non-secret config
+# ══════════════════════════════════════════════════════════════════
+secrets-check:
+	@bash scripts/secrets-check.sh
+
+secrets-push: secrets-check
+	@bash scripts/secrets-push.sh all
+
+secrets-push-traefik: secrets-check
+	@bash scripts/secrets-push.sh traefik
+
+secrets-push-seafile: secrets-check
+	@bash scripts/secrets-push.sh seafile
+
+secrets-push-openwebui: secrets-check
+	@bash scripts/secrets-push.sh openwebui
+
+secrets-pull:
+	@bash scripts/secrets-pull.sh
+
+
+
+

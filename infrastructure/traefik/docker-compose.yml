@@ -14,7 +14,7 @@
 services:
   traefik:
     image: traefik:v2.11
-    pull_policy: never          # always use locally loaded image, never pull
+    pull_policy: never # always use locally loaded image, never pull
     container_name: traefik
     restart: unless-stopped
     ports:
@@ -23,7 +23,7 @@ services:
     volumes:
       - ./traefik.yml:/traefik.yml:ro
       - ./config:/config:ro
-      - ./letsencrypt:/letsencrypt   # SSL certs — never delete this directory
+      - ./letsencrypt:/letsencrypt # SSL certs — never delete this directory
       - ./logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
