@@ -1,0 +1,38 @@
+# .github/dependabot.yml
+#
+# Automated dependency updates.
+# Dependabot opens PRs weekly for outdated deps — each PR runs the full CI
+# (lint, type-check, Trivy, build-check) before any human review is needed.
+# This closes the loop on the CI/CD pipeline: code changes AND dependency
+# changes both go through the same quality gates.
+
+version: 2
+updates:
+  # GitHub Actions — pins actions to exact SHAs are ideal but version tags
+  # are acceptable for public repos. Dependabot will bump action versions
+  # (e.g. actions/checkout@v4 → v5) automatically.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+
+  # npm / bun — website/ uses bun but package-ecosystem: npm handles
+  # package.json correctly regardless of which package manager installs them.
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - javascript
+    # Group all non-major updates into a single PR to reduce noise.
+    groups:
+      non-major:
+        update-types:
+          - minor
+          - patch

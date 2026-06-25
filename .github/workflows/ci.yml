@@ -1,0 +1,110 @@
+# .github/workflows/ci.yml
+#
+# CI — runs on every PR targeting main.
+# Gates merge: lint, type-check, security scan (FS), Docker build validation, CodeQL (SAST).
+# Nothing is pushed to a registry here — push only happens after merge (see deploy.yml).
+#
+# Why these tools?
+#   - bun lint / tsc: native to the project's existing toolchain, zero new dependencies
+#   - Trivy (FS): industry-standard open-source CVE scanner; the natural choice for a
+#     Docker-based project — scans dependencies before a single byte is built
+#   - CodeQL: free for public repos, native to GitHub, no external service needed
+#   - build-push-action (push:false): validates the Dockerfile + multi-stage build
+#     without polluting the registry with unreviewed images
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight CI runs for the same branch when a new commit is pushed.
+# Keeps runners free and gives fast feedback on the latest commit only.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Lint + Type-check ────────────────────────────────────────────────────
+  lint-typecheck:
+    name: Lint & Type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: website
+
+      - name: Lint (next lint)
+        run: bun run lint
+        working-directory: website
+
+      - name: Type-check (tsc --noEmit)
+        run: bun run type-check
+        working-directory: website
+
+  # ── 2. Security — Trivy filesystem scan ────────────────────────────────────
+  trivy-fs:
+    name: Trivy FS Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # needed to upload SARIF to GitHub Security tab
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy — scan source + dependency manifests
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          exit-code: '1'           # fail the job on findings
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy-fs.sarif
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()               # upload even if Trivy found issues
+        with:
+          sarif_file: trivy-fs.sarif
+
+  # ── 3. SAST — CodeQL ────────────────────────────────────────────────────────
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: typescript
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+
+  # ── 4. Docker build validation ──────────────────────────────────────────────
+  build-check:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build the image but do NOT push — validates the Dockerfile and
+      # multi-stage build (Bun builder → nginx:alpine) without polluting GHCR.
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
