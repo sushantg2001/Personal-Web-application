@@ -116,7 +116,7 @@ jobs:
       # Build the image but do NOT push — validates the Dockerfile and
       # multi-stage build (Bun builder → nginx:alpine) without polluting GHCR.
       - name: Build image (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
