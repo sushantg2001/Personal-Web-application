@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "website-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--cwd", "website", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "design-cards",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3210", "-d", "website/design-system"],
+      "port": 3210
+    }
+  ]
+}
