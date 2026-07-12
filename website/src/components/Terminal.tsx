@@ -171,7 +171,7 @@ export default function Terminal() {
       {/* Output */}
       <div
         className="p-5 min-h-64 max-h-[70vh] overflow-y-auto text-sm leading-relaxed"
-        style={{ fontFamily: "var(--font-geist-mono)" }}
+        style={{ fontFamily: "var(--font-mono)" }}
       >
         {history.map((entry, i) =>
           entry.type === "boot" ? (
@@ -221,7 +221,7 @@ export default function Terminal() {
             style={{
               color: "var(--text)",
               caretColor: "var(--green)",
-              fontFamily: "var(--font-geist-mono)",
+              fontFamily: "var(--font-mono)",
             }}
           />
         </form>

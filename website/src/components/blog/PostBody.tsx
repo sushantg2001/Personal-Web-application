@@ -30,7 +30,7 @@ export async function PostBody({ content }: Props) {
 
   return (
     <article
-      className="prose"
+      className="prose dark:prose-invert"
       dangerouslySetInnerHTML={{ __html: result.toString() }}
     />
   )
