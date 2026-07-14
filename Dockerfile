@@ -14,6 +14,10 @@ RUN bun run build
 # ── Stage 2: Serve ────────────────────────────────────────────────
 FROM nginx:alpine AS runner
 
+# Upgrade OS packages to pull in Alpine security fixes the base image lags on
+# (e.g. c-ares, libexpat HIGH CVEs). Keeps the Trivy image scan gate green.
+RUN apk update && apk upgrade --no-cache
+
 # Copy built static files from builder stage
 COPY --from=builder /website/out /usr/share/nginx/html
 
