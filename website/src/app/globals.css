@@ -2,7 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ── Design tokens — "Field Notes" ─────────────────────────────────
+   Warm paper + ink, moss accent, sharp 2px radii. Pulled from the
+   claude.ai/design project (styles.css) 2026-07-07. Values are OKLCH
+   component triplets consumed as oklch(var(--x) / <alpha>) via
+   tailwind.config.ts, keeping shadcn-compatible slot names. */
+
+@layer base {
+  :root {
+    --background: 96.6% 0.012 85;      /* warm paper */
+    --foreground: 24.5% 0.02 80;       /* ink */
+    --card: 98.6% 0.007 85;            /* surface */
+    --card-foreground: 24.5% 0.02 80;
+    --popover: 98.6% 0.007 85;
+    --popover-foreground: 24.5% 0.02 80;
+    --primary: 50% 0.1 145;            /* moss */
+    --primary-foreground: 97% 0.01 85; /* on-accent */
+    --secondary: 98.6% 0.007 85;
+    --secondary-foreground: 24.5% 0.02 80;
+    --muted: 98.6% 0.007 85;
+    --muted-foreground: 48% 0.02 80;
+    --accent: 93.5% 0.03 145;          /* solid moss wash */
+    --accent-foreground: 24.5% 0.02 80;
+    --destructive: 55% 0.19 25;
+    --destructive-foreground: 97% 0.01 85;
+    --border: 85% 0.015 85;            /* hairline: ink @ .16 over paper */
+    --input: 85% 0.015 85;
+    --ring: 50% 0.1 145;
+    --amber: 58% 0.1 70;               /* support color, sparingly */
+    --radius: 2px;
+  }
+
+  .dark {
+    --background: 20.5% 0.015 150;     /* deep green-tinted charcoal */
+    --foreground: 93% 0.012 95;
+    --card: 23.5% 0.015 150;
+    --card-foreground: 93% 0.012 95;
+    --popover: 23.5% 0.015 150;
+    --popover-foreground: 93% 0.012 95;
+    --primary: 74% 0.11 150;
+    --primary-foreground: 20.5% 0.015 150;
+    --secondary: 23.5% 0.015 150;
+    --secondary-foreground: 93% 0.012 95;
+    --muted: 23.5% 0.015 150;
+    --muted-foreground: 69% 0.018 110;
+    --accent: 26% 0.03 150;
+    --accent-foreground: 93% 0.012 95;
+    --destructive: 60% 0.17 25;
+    --destructive-foreground: 97% 0.01 85;
+    --border: 31.5% 0.015 130;
+    --input: 31.5% 0.015 130;
+    --ring: 74% 0.11 150;
+    --amber: 78% 0.1 75;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  ::selection {
+    background: oklch(var(--primary) / 0.15);
+  }
+}
+
+@layer components {
+  /* mono uppercase section label with moss index — .label / .idx in the DS */
+  .label {
+    @apply font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground;
+  }
+  .label .idx {
+    @apply text-primary;
+  }
+  .rule-dotted {
+    border: 0;
+    border-top: 1px dotted oklch(var(--foreground) / 0.55);
+  }
+}
+
+/* ── Terminal easter egg (/terminal) ───────────────────────────────
+   Scoped palette for the legacy terminal component. */
+.terminal-theme {
   --bg: #0c0c0c;
   --surface: #141414;
   --border: #1e1e1e;
@@ -13,44 +100,14 @@
   --red: #f87171;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-geist-mono), monospace;
-  -webkit-font-smoothing: antialiased;
-  line-height: 1.7;
-  /* subtle crt scanlines */
-  background-image: repeating-linear-gradient(
-    0deg, transparent, transparent 2px,
-    rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
-  );
-}
-
-::selection { background: var(--green); color: var(--bg); }
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); }
-
 @keyframes blink {
-  0%,100% { opacity: 1; }
+  0%, 100% { opacity: 1; }
   50%      { opacity: 0; }
 }
+
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-
-.cursor {
-  display: inline-block;
-  width: 0.55ch;
-  height: 1.1em;
-  background: var(--green);
-  vertical-align: text-bottom;
-  animation: blink 1s step-end infinite;
-  margin-left: 2px;
 }
 
 .fade-in {

@@ -146,3 +146,10 @@ export function formatDate(dateString: string): string {
     day: 'numeric',
   })
 }
+
+/**
+ * Plain ISO date (YYYY-MM-DD) — the "Field Notes" list style.
+ */
+export function formatDateISO(dateString: string): string {
+  return dateString.slice(0, 10)
+}

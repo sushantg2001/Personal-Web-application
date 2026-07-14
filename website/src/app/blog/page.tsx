@@ -1,113 +1,50 @@
-// app/src/app/blog/page.tsx
-import type { Metadata } from 'next'
-import Link from 'next/link'
-import { getAllPosts, getCategories, formatDate } from '@/lib/blog'
+import type { Metadata } from "next";
+import { getAllPosts, getCategories } from "@/lib/blog";
+import { Badge } from "@/components/ui/badge";
+import { PostCard } from "@/components/site/post-card";
 
 export const metadata: Metadata = {
-  title: 'Blog — Sushant Gupta',
-  description: 'Writing on infrastructure, development, and things I find interesting.',
-}
+  title: "writing",
+  description:
+    "Field notes on infrastructure, working with Claude, and notes that compound.",
+};
 
 export default function BlogPage() {
-  const posts = getAllPosts()
-  const categories = getCategories()
-
-  if (posts.length === 0) {
-    return (
-      <main className="max-w-2xl mx-auto px-6 py-24">
-        <p style={{ color: 'var(--dim)', fontFamily: 'var(--font-geist-mono)' }}>
-          no posts yet
-        </p>
-      </main>
-    )
-  }
+  const posts = getAllPosts();
+  const categories = getCategories();
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-16">
-
-      {/* Header */}
-      <div className="mb-12">
-        <Link
-          href="/"
-          className="font-mono text-xs mb-6 block"
-          style={{ color: 'var(--dim)' }}
-        >
-          ← home
-        </Link>
-        <h1
-          className="text-3xl font-bold tracking-tight mb-2"
-          style={{ color: 'var(--text)' }}
-        >
-          writing
-        </h1>
-        <p className="font-mono text-sm" style={{ color: 'var(--dim)' }}>
-          {posts.length} post{posts.length !== 1 ? 's' : ''}
+    <main className="mx-auto max-w-2xl px-6 py-16">
+      <header className="mb-10">
+        <p className="label mb-4">
+          <span className="idx">01/</span> Writing
         </p>
-      </div>
+        <h1 className="font-serif text-[34px] font-normal leading-tight">
+          Field notes
+          <span className="text-primary">.</span>
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          {posts.length === 0
+            ? "Nothing here yet — first note coming soon."
+            : `${posts.length} note${posts.length !== 1 ? "s" : ""} on infrastructure, Claude workflows, and things worth writing down.`}
+        </p>
+      </header>
 
-      {/* Category pills — display only, no routing */}
       {categories.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-10">
-          {categories.map(cat => (
-            <span
-              key={cat}
-              className="font-mono text-xs px-3 py-1 border"
-              style={{ borderColor: 'var(--border)', color: 'var(--dim)' }}
-            >
+        <div className="mb-8 flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <Badge key={cat} variant="outline">
               {cat}
-            </span>
+            </Badge>
           ))}
         </div>
       )}
 
-      {/* Post list */}
       <div className="flex flex-col">
-        {posts.map(post => (
-          <Link
-            key={post.slug}
-            href={post.href}
-            className="group py-5 border-b flex gap-6 items-start"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            {/* Date */}
-            <span
-              className="font-mono text-xs pt-1 shrink-0 w-24"
-              style={{ color: 'var(--dim)' }}
-            >
-              {formatDate(post.date)}
-            </span>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <h2
-                className="font-medium mb-1 group-hover:underline"
-                style={{ color: 'var(--text)' }}
-              >
-                {post.title}
-              </h2>
-              {post.description && (
-                <p
-                  className="text-sm line-clamp-2"
-                  style={{ color: 'var(--dim)' }}
-                >
-                  {post.description}
-                </p>
-              )}
-              <div className="flex gap-3 mt-2 flex-wrap">
-                {post.category && (
-                  <span className="font-mono text-xs" style={{ color: 'var(--dim)' }}>
-                    {post.category}
-                  </span>
-                )}
-                <span className="font-mono text-xs" style={{ color: 'var(--dim)' }}>
-                  {post.readingTime} min read
-                </span>
-              </div>
-            </div>
-          </Link>
+        {posts.map((post) => (
+          <PostCard key={post.slug} post={post} />
         ))}
       </div>
-
     </main>
-  )
+  );
 }
