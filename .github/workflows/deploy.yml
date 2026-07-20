@@ -143,7 +143,7 @@ jobs:
           name: deploy-manifest
 
       - name: Deploy to VM
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           DIGEST: ${{ needs.build.outputs.digest }}
           IMAGE_URI: ${{ needs.build.outputs.image-uri }}
