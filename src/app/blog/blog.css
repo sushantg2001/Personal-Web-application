@@ -1,0 +1,81 @@
+/* Blog post extras. Base typography comes from @tailwindcss/typography
+   (see tailwind.config.ts). This file only themes highlight.js output
+   so code blocks match the site palette in both modes. */
+
+.prose pre code.hljs {
+  padding: 0;
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: oklch(var(--muted-foreground));
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-section,
+.hljs-meta {
+  color: oklch(var(--primary));
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute {
+  color: oklch(var(--amber));
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-type,
+.hljs-built_in,
+.hljs-symbol {
+  color: hsl(30 70% 40%);
+}
+
+.dark .hljs-number,
+.dark .hljs-literal,
+.dark .hljs-type,
+.dark .hljs-built_in,
+.dark .hljs-symbol {
+  color: hsl(35 75% 65%);
+}
+
+.hljs-title,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-function {
+  color: hsl(210 50% 45%);
+}
+
+.dark .hljs-title,
+.dark .hljs-name,
+.dark .hljs-selector-id,
+.dark .hljs-selector-class,
+.dark .hljs-function {
+  color: hsl(210 60% 70%);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-params {
+  color: oklch(var(--foreground) / 0.85);
+}
+
+.hljs-deletion {
+  color: oklch(var(--destructive));
+}
+
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+
+/* GFM task lists */
+.prose input[type="checkbox"] {
+  accent-color: oklch(var(--primary));
+  margin-right: 0.5rem;
+}

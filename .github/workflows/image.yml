@@ -1,0 +1,86 @@
+# .github/workflows/image.yml
+#
+# Build once. Every merge to main builds the site image, pushes it to GHCR as
+# :sha-<commit> and attests it. Nothing is deployed from here, and the image just waits in
+# the registry until a signed tag promotes it (release.yml). A tag never rebuilds, so what
+# ships is the exact image that was built from the tagged commit.
+#
+# The attestation names this workflow as the signer. release.yml refuses any image that does
+# not carry one made here, from the tagged commit.
+#
+# Scanning is left to release.yml, so a CVE published between the merge and the tag still
+# blocks the release.
+
+name: Image
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/website
+
+jobs:
+  image:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A signed record of which workflow built this digest, from which commit. release.yml and
+      # the deploy side verify it with
+      #   gh attestation verify oci://<image>@<digest> --repo OWNER/REPO \
+      #     --signer-workflow OWNER/REPO/.github/workflows/image.yml
+      - name: Attest the image
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Summary
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Image built"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| image | \`$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA\` |"
+            echo "| digest | \`$DIGEST\` |"
+            echo ""
+            echo "Not deployed. A signed tag on this commit promotes it (release.yml)."
+          } >> "$GITHUB_STEP_SUMMARY"

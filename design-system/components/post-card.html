@@ -1,0 +1,46 @@
+<!-- @dsCard name="Post row" group="Components" subtitle="ISO date · display title · tags" width="640" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Familjen+Grotesk:wght@400..700&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:oklch(96.6% 0.012 85);--surface:oklch(98.6% 0.007 85);--ink:oklch(24.5% 0.02 80);--muted:oklch(48% 0.02 80);--line:oklch(24.5% 0.02 80 / 0.16);--line-strong:oklch(24.5% 0.02 80 / 0.55);--moss:oklch(50% 0.1 145);--amber:oklch(58% 0.1 70);--moss-wash:oklch(50% 0.1 145 / 0.08);--on-accent:oklch(97% 0.01 85);--radius:2px;--font-display:'Young Serif',Georgia,serif;--font-body:'Familjen Grotesk',system-ui,sans-serif;--font-mono:'Fragment Mono',ui-monospace,monospace}
+.dark{--bg:oklch(20.5% 0.015 150);--surface:oklch(23.5% 0.015 150);--ink:oklch(93% 0.012 95);--muted:oklch(69% 0.018 110);--line:oklch(93% 0.012 95 / 0.15);--line-strong:oklch(93% 0.012 95 / 0.5);--moss:oklch(74% 0.11 150);--amber:oklch(78% 0.1 75);--moss-wash:oklch(74% 0.11 150 / 0.1);--on-accent:oklch(20.5% 0.015 150)}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.display{font-family:var(--font-display);font-weight:400;line-height:1.12;letter-spacing:-0.005em}
+.mono{font-family:var(--font-mono)}
+.muted{color:var(--muted)}
+.label{font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+.label .idx{color:var(--moss)}
+.rule-dotted{border:0;border-top:1px dotted var(--line-strong);margin:0}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.stack{display:flex;flex-direction:column;gap:16px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px;border-radius:var(--radius);font:500 14px/1 var(--font-body);letter-spacing:0.01em;border:1px solid transparent;cursor:pointer;text-decoration:none}
+.btn-solid{background:var(--ink);color:var(--bg)}
+.btn-outline{background:transparent;border-color:var(--line-strong);color:var(--ink)}
+.btn-ghost{background:transparent;color:var(--muted)}
+.btn-mono{font-family:var(--font-mono);font-size:13px;text-transform:lowercase}
+.btn-sm{height:32px;padding:0 12px;font-size:13px}
+.btn-lg{height:46px;padding:0 24px;font-size:15px}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--radius);font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.02em;border:1px solid var(--line);color:var(--muted);background:transparent}
+.tag-moss{border-color:transparent;background:var(--moss-wash);color:var(--moss)}
+.tag-solid{border-color:transparent;background:var(--ink);color:var(--bg)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+a.plain{color:var(--ink);text-decoration:none}
+</style>
+</head>
+<body>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:20px;padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+    <div class="mono muted" style="font-size:12.5px;padding-top:4px">2026-03-15</div>
+    <div>
+      <div class="display" style="font-size:21px">Docker basics: a practical guide</div>
+      <p class="muted" style="margin:6px 0 10px;font-size:14.5px">Containers, images, and the handful of commands you actually need day to day.</p>
+      <div class="row" style="gap:8px"><span class="tag">docker</span><span class="mono muted" style="font-size:11.5px">4 min</span></div>
+    </div></div>
+<p class="muted" style="font-size:13px;margin:14px 0 0">Writing list row: 120px mono date column, Young Serif title (turns moss on hover), hairline separators.</p>
+</body>
+</html>

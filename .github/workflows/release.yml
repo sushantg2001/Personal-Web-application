@@ -1,0 +1,274 @@
+# .github/workflows/release.yml
+#
+# A release is a promotion. A signed tag builds nothing: it picks the image image.yml already
+# built from the tagged commit, checks it, scans it, names it after the tag and, after your
+# approval, asks the private config repo (`workstation`) to open a pull request that sets the
+# new digest. Merging that pull request is the deploy. Git there is the record of what runs on
+# the VPS, and a rollback is a revert.
+#
+#   git tag -s 2026.11.15 -m 2026.11.15 && git push origin 2026.11.15     (one YubiKey tap)
+#
+# This repo never touches the server. It holds no SSH key and no service credentials, and it
+# cannot write code to the config repo: its one credential is a GitHub App key whose
+# installation token can only start a workflow there.
+#
+# PLACEHOLDERS: the config repo is not on GitHub yet. Until it is, this workflow still checks,
+# scans and names the image, and skips the hand-off. When the repo exists, set on THIS repo:
+#
+#   vars.WORKSTATION_REPO       name of the config repo, same owner. Unset: hand-off skipped.
+#   vars.WORKSTATION_WORKFLOW   workflow file there that opens the pull request.
+#                               Default: bump-website.yml
+#   vars.DEPLOY_APP_ID          a GitHub App installed on that one repo with Actions: write
+#   secrets.DEPLOY_APP_PRIVATE_KEY    that App's key, stored in the `deploy` environment
+#
+# The workflow there takes three inputs, and must verify the attestation itself before it
+# opens the pull request, never trusting what it is told:
+#
+#   image_digest   sha256:...
+#   tag            2026.11.15
+#   commit         the full commit sha the tag points at
+#
+#   gh attestation verify oci://ghcr.io/OWNER/website@<image_digest> \
+#     --repo OWNER/Personal-Web-application \
+#     --signer-workflow OWNER/Personal-Web-application/.github/workflows/image.yml \
+#     --source-digest <commit>
+#
+# Why a GitHub App and workflow_dispatch rather than a PAT and repository_dispatch:
+#
+#   POST /actions/workflows/{id}/dispatches   needs  Actions: write
+#   POST /dispatches  (repository_dispatch)   needs  Contents: write
+#
+# Actions:write starts existing workflows; Contents:write can push code. The smaller one is
+# enough, and the App mints a fresh 1-hour token per run scoped to one repo and one
+# permission, rather than a standing PAT sitting in a public repo's secrets.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/website
+
+jobs:
+  # The tag must be a signed, annotated tag on the default branch, and the image built from
+  # its commit must exist and carry an attestation made by image.yml.
+  check:
+    name: Check tag and image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    outputs:
+      uri: ${{ steps.image.outputs.uri }}
+      digest: ${{ steps.image.outputs.digest }}
+      commit: ${{ steps.image.outputs.commit }}
+    env:
+      TAG: ${{ github.ref_name }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Tag is annotated and signed
+        run: |
+          read -r type sha < <(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '"\(.object.type) \(.object.sha)"')
+          [ "$type" = "tag" ] || { echo "::error::$TAG is not an annotated tag. Create it with git tag -s."; exit 1; }
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .verification.verified)" = "true" ] \
+            || { echo "::error::The signature on tag $TAG is not verified."; exit 1; }
+      - name: Tagged commit is on the default branch
+        run: |
+          commit="$(git rev-parse "$TAG^{commit}")"
+          git merge-base --is-ancestor "$commit" "origin/$DEFAULT_BRANCH" \
+            || { echo "::error::$TAG is not on $DEFAULT_BRANCH."; exit 1; }
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # image.yml builds on every merge, so the image normally exists already. If the tag was
+      # pushed right after the merge, wait for that build to finish.
+      - name: Find the image built from this commit
+        id: image
+        run: |
+          uri="$REGISTRY/$IMAGE_NAME"
+          commit="$(git rev-parse "$TAG^{commit}")"
+          digest=""
+          for i in $(seq 1 45); do
+            digest="$(docker buildx imagetools inspect "$uri:sha-$commit" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+            [ -n "$digest" ] && break
+            echo "No image for $commit yet ($i/45); image.yml may still be running."
+            sleep 20
+          done
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] \
+            || { echo "::error::No image for $commit. image.yml builds one on every merge to main; check that its run succeeded."; exit 1; }
+          { echo "uri=$uri"; echo "digest=$digest"; echo "commit=$commit"; } >> "$GITHUB_OUTPUT"
+
+      # The tag :sha-<commit> can be moved by anything that can push to the package. The
+      # attestation cannot: it ties this digest to image.yml running on this commit.
+      - name: Image was built by image.yml from this commit
+        env:
+          URI: ${{ steps.image.outputs.uri }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          COMMIT: ${{ steps.image.outputs.commit }}
+        run: |
+          for i in $(seq 1 8); do
+            gh attestation verify "oci://$URI@$DIGEST" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/image.yml" \
+              --source-digest "$COMMIT" && exit 0
+            echo "Not verified yet ($i/8); the attestation may still be on its way."
+            sleep 15
+          done
+          echo "::error::No attestation from image.yml for $URI@$DIGEST at $COMMIT."
+          exit 1
+
+  scan:
+    name: Trivy Image Scan
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Scan by digest, exactly what will ship, against today's vulnerability database.
+      # Catches OS-package CVEs from the base image that the FS scan on the PR cannot see.
+      #
+      # Two invocations, split on purpose: see ci.yml's Trivy FS Scan job.
+      - name: Trivy — generate SARIF report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ needs.check.outputs.uri }}@${{ needs.check.outputs.digest }}
+          exit-code: '0'
+          format: sarif
+          output: trivy-image.sarif
+
+      - uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+
+      - name: Trivy — fail on CRITICAL/HIGH findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ needs.check.outputs.uri }}@${{ needs.check.outputs.digest }}
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          format: table
+
+  # Only reached once the image is verified AND clean. A failed scan means nothing is named
+  # or handed off, so an image with a CRITICAL CVE never reaches the config repo.
+  release:
+    name: Release and hand off
+    needs: [check, scan]
+    runs-on: ubuntu-latest
+    # DEPLOY_APP_PRIVATE_KEY lives in this environment, which only main and tags can use and
+    # which waits for your approval (`just github repo --harden`). A branch with an edited
+    # workflow cannot read it. The pull request you merge in the config repo is the second,
+    # deliberate step; if this approval feels like one too many, remove the reviewer in
+    # Settings > Environments > deploy.
+    environment: deploy
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ github.ref_name }}
+      URI: ${{ needs.check.outputs.uri }}
+      DIGEST: ${{ needs.check.outputs.digest }}
+      COMMIT: ${{ needs.check.outputs.commit }}
+      WORKSTATION_REPO: ${{ vars.WORKSTATION_REPO }}
+      WORKSTATION_WORKFLOW: ${{ vars.WORKSTATION_WORKFLOW || 'bump-website.yml' }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # A name for people. The digest, not this tag, is what the config repo pins. Copying the
+      # manifest keeps the digest, which the check below proves.
+      - name: Name the image after the tag
+        run: |
+          docker buildx imagetools create --tag "$URI:$TAG" "$URI@$DIGEST"
+          now="$(docker buildx imagetools inspect "$URI:$TAG" --format '{{.Manifest.Digest}}')"
+          [ "$now" = "$DIGEST" ] \
+            || { echo "::error::Naming the image changed its digest ($now, expected $DIGEST)."; exit 1; }
+
+      - name: Mint a scoped, short-lived token
+        if: vars.WORKSTATION_REPO != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: app
+        with:
+          app-id: ${{ vars.DEPLOY_APP_ID }}
+          private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.WORKSTATION_REPO }}
+          permission-actions: write
+
+      - name: Ask the config repo to open the deploy pull request
+        if: vars.WORKSTATION_REPO != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          gh workflow run "$WORKSTATION_WORKFLOW" --repo "$OWNER/$WORKSTATION_REPO" \
+            -f image_digest="$DIGEST" \
+            -f tag="$TAG" \
+            -f commit="$COMMIT"
+
+          {
+            echo "### Released $TAG"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| digest | \`$DIGEST\` |"
+            echo "| commit | \`$COMMIT\` |"
+            echo ""
+            echo "The config repo opens the deploy pull request; merging it deploys this digest."
+            echo "Progress: https://github.com/$OWNER/$WORKSTATION_REPO/actions/workflows/$WORKSTATION_WORKFLOW"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hand-off skipped (placeholder)
+        if: vars.WORKSTATION_REPO == ''
+        run: |
+          echo "::notice::vars.WORKSTATION_REPO is not set, so nothing was handed off."
+          {
+            echo "### Released $TAG, not handed off"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| digest | \`$DIGEST\` |"
+            echo "| commit | \`$COMMIT\` |"
+            echo ""
+            echo "The image is checked, scanned and named. Set \`WORKSTATION_REPO\` (and the App"
+            echo "variables, see the top of release.yml) to open the deploy pull request from here,"
+            echo "or set the digest in the config repo by hand."
+          } >> "$GITHUB_STEP_SUMMARY"
