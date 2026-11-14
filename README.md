@@ -50,7 +50,7 @@ no credentials here.
 ## Contributing
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). CI
-runs lint, type-check, the content validator, CodeQL, a Trivy filesystem scan
+runs lint, type-check and the content validator
 and a Docker build on every pull request, and none of it needs a secret, so a
 fork PR gets the same signal I do.
 

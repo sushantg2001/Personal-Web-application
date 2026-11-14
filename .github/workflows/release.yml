@@ -157,14 +157,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Scan by digest, exactly what will ship, against today's vulnerability database.
-      # Catches OS-package CVEs from the base image that the FS scan on the PR cannot see.
+      # Catches OS-package CVEs from the base image.
       #
-      # Two invocations, split on purpose: see ci.yml's Trivy FS Scan job.
+      # Two invocations, split on purpose: trivy-action's SARIF output always
+      # contains all severities and its exit-code check does not reliably respect the `severity`
+      # filter against it, so SARIF generation never fails and a table-format run is the gate.
       - name: Trivy — generate SARIF report
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ needs.check.outputs.uri }}@${{ needs.check.outputs.digest }}
-          exit-code: '0'
+          exit-code: "0"
           format: sarif
           output: trivy-image.sarif
 
@@ -177,7 +179,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ needs.check.outputs.uri }}@${{ needs.check.outputs.digest }}
-          exit-code: '1'
+          exit-code: "1"
           severity: CRITICAL,HIGH
           format: table
 
