@@ -1,7 +1,7 @@
 # .github/workflows/release.yml
 #
 # A release is a promotion. A signed tag builds nothing: it picks the image image.yml already
-# built from the tagged commit, checks it, scans it, names it after the tag and, after your
+# tagged for the tagged commit, checks it, scans it, names it after the tag and, after your
 # approval, asks the private config repo (`workstation`) to open a pull request that sets the
 # new digest. Merging that pull request is the deploy. Git there is the record of what runs on
 # the VPS, and a rollback is a revert.
@@ -61,7 +61,7 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/website
 
 jobs:
-  # The tag must be a signed, annotated tag on the default branch, and the image built from
+  # The tag must be a signed, annotated tag on the default branch, and the image for
   # its commit must exist and carry an attestation made by image.yml.
   check:
     name: Check tag and image
@@ -104,10 +104,10 @@ jobs:
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      # image.yml builds every merge that changes the site, so the image normally exists already.
-      # If the tag was pushed right after the merge, wait for that build to finish. A commit that
-      # only touched CI, docs or scripts has none: `gh workflow run image.yml --ref <tag>`.
-      - name: Find the image built from this commit
+      # image.yml tags an image for every merge to main (built when the site changed, retagged
+      # from the previous commit when not), so it normally exists already. If the tag was
+      # pushed right after the merge, wait for that run to finish.
+      - name: Find the image for this commit
         id: image
         run: |
           uri="$REGISTRY/$IMAGE_NAME"
@@ -120,7 +120,7 @@ jobs:
             sleep 20
           done
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] \
-            || { echo "::error::No image for $commit. image.yml builds one on merges that change the site. Check that its run succeeded, or for a CI/docs-only commit run: gh workflow run image.yml --ref $TAG"; exit 1; }
+            || { echo "::error::No image for $commit. image.yml tags one on every merge to main; check that its run succeeded."; exit 1; }
           { echo "uri=$uri"; echo "digest=$digest"; echo "commit=$commit"; } >> "$GITHUB_OUTPUT"
 
       # The tag :sha-<commit> can be moved by anything that can push to the package. The
