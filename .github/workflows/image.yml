@@ -1,12 +1,17 @@
 # .github/workflows/image.yml
 #
-# Build once. Every merge to main builds the site image, pushes it to GHCR as
-# :sha-<commit> and attests it. Nothing is deployed from here, and the image just waits in
-# the registry until a signed tag promotes it (release.yml). A tag never rebuilds, so what
-# ships is the exact image that was built from the tagged commit.
+# Build once. Every merge to main gets an image at :sha-<commit> in GHCR, attested. If the merge
+# changed the site, the image is built. If it only touched CI, docs or scripts, nothing in the
+# image would differ, so the previous commit's image is tagged with the new commit instead
+# (a registry-side copy: same digest, no build). Either way every commit on main can be tagged
+# for a release. Nothing is deployed from here, and the image just waits in the registry until a
+# signed tag promotes it (release.yml). A tag never rebuilds, so what ships is the image that
+# was built from the tagged commit, or from the last commit before it that changed the site.
 #
 # The attestation names this workflow as the signer. release.yml refuses any image that does
-# not carry one made here, from the tagged commit.
+# not carry one made here, for the tagged commit. A retag is attested again for its own commit,
+# so the check is the same for both. For a retag it says this workflow vouched for the digest at
+# that commit, not that it built it.
 #
 # Scanning is left to release.yml, so a CVE published between the merge and the tag still
 # blocks the release.
@@ -16,17 +21,19 @@ name: Image
 on:
   push:
     branches: [main]
+  # Force a build of the chosen ref, never a retag.
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/website
 
 jobs:
   image:
-    name: Build & Push
+    name: Build or retag
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -36,6 +43,8 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -44,10 +53,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Retag only when it is certain the image would be identical: a push, nothing under the
+      # Docker context changed since the previous tip of main, this workflow is untouched, and
+      # the previous tip has an image. Anything else, including an error, builds.
+      # The excluded paths mirror .dockerignore (the :(glob) form keeps *.md to the repo root,
+      # so content/blog/*.md still counts). Keep the two in step.
+      - name: Decide
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          uri="$REGISTRY/$IMAGE_NAME"
+          action=build digest=""
+          if [ "$GITHUB_EVENT_NAME" = push ] && [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] \
+             && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- . \
+                 ':(exclude).github' ':(exclude).claude' ':(exclude)design-system' \
+                 ':(exclude)scripts' ':(exclude)justfile' ':(exclude)LICENSE' \
+                 ':(exclude).gitignore' ':(exclude,glob)*.md' \
+               && git diff --quiet "$BEFORE" "$GITHUB_SHA" -- .github/workflows/image.yml; then
+              digest="$(docker buildx imagetools inspect "$uri:sha-$BEFORE" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+              if [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                action=retag
+              else
+                echo "No image for $BEFORE; building."
+                digest=""
+              fi
+            fi
+          fi
+          echo "Plan: $action"
+          { echo "action=$action"; echo "digest=$digest"; } >> "$GITHUB_OUTPUT"
+
+      - name: Retag the previous image
+        if: steps.plan.outputs.action == 'retag'
+        env:
+          DIGEST: ${{ steps.plan.outputs.digest }}
+        run: |
+          docker buildx imagetools create -t "$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA" "$REGISTRY/$IMAGE_NAME@$DIGEST"
+          now="$(docker buildx imagetools inspect "$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA" --format '{{.Manifest.Digest}}')"
+          [ "$now" = "$DIGEST" ] || { echo "::error::Retag produced $now, expected $DIGEST."; exit 1; }
+
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.plan.outputs.action == 'build'
 
       - name: Build and push
         id: build
+        if: steps.plan.outputs.action == 'build'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
@@ -59,23 +110,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # A signed record of which workflow built this digest, from which commit. release.yml and
-      # the deploy side verify it with
+      # A signed record of which workflow vouched for this digest, at which commit. release.yml
+      # and the deploy side verify it with
       #   gh attestation verify oci://<image>@<digest> --repo OWNER/REPO \
       #     --signer-workflow OWNER/REPO/.github/workflows/image.yml
       - name: Attest the image
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.build.outputs.digest || steps.plan.outputs.digest }}
           push-to-registry: true
 
       - name: Summary
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
+          ACTION: ${{ steps.plan.outputs.action }}
+          DIGEST: ${{ steps.build.outputs.digest || steps.plan.outputs.digest }}
         run: |
           {
-            echo "### Image built"
+            if [ "$ACTION" = retag ]; then echo "### Image retagged (site unchanged)"; else echo "### Image built"; fi
             echo ""
             echo "| | |"
             echo "|---|---|"
