@@ -1,6 +1,6 @@
 # .github/workflows/image.yml
 #
-# Build once. Every merge to main builds the site image, pushes it to GHCR as
+# Build once. Every merge to main that changes the site builds the image, pushes it to GHCR as
 # :sha-<commit> and attests it. Nothing is deployed from here, and the image just waits in
 # the registry until a signed tag promotes it (release.yml). A tag never rebuilds, so what
 # ships is the exact image that was built from the tagged commit.
@@ -16,10 +16,28 @@ name: Image
 on:
   push:
     branches: [main]
+    # Only what changes the image. The Docker context already leaves out .github, scripts,
+    # design-system, README.md and justfile (.dockerignore), so a merge that touches only
+    # those would rebuild the same site. Keep this list in step with .dockerignore.
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/image.yml'
+      - '!.claude/**'
+      - '!design-system/**'
+      - '!scripts/**'
+      - '!content/inbox/**'
+      - '!justfile'
+      - '!*.md'
+      - '!LICENSE'
+      - '!.gitignore'
+  # A tag on a commit the filter skipped has no image, so build one on demand:
+  #   gh workflow run image.yml --ref <tag>
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/website
